@@ -1,0 +1,14 @@
+{% extends 'ssltracker/base.html' %}
+
+{% block content %}
+
+  <h3>Add Contact</h3>
+  
+  <div class="form-group">
+  <form method="POST">
+    {% csrf_token %}
+    {{ form.as_p }}
+    <button type="submit">Submit</button>
+  </form>
+</div>
+{% endblock %}

@@ -1,0 +1,31 @@
+{% extends 'ssltracker/base.html' %}
+
+{% load bootstrap5 %}
+
+{% block content %}
+
+<p>&nbsp;</p>
+<table class="table table-striped">
+  <thead>
+    <tr>
+      <th scope="col">First Name</th>
+      <th scope="col">Middle Name</th>
+      <th scope="col">Last Name</th>
+      <th scope="col">Email Address</th>
+      <th scope="col">Actions</th>
+    </tr>
+  </thead>
+  <tbody>
+    {% for item in data %}
+      <tr>
+        <td>{{ item.first_name }}</td>
+        <td>{{ item.middle_name }}</td>
+        <td>{{ item.last_name }}</td>
+        <td>{{ item.email }}</td>
+        <td><a href="{% url 'edit_contact' item.pk %}"><button type="button" class="btn btn-primary"><i class="bi bi-pencil-square"></i>Edit</button></a>&nbsp;&nbsp;<a href="{% url 'delete_contact' item.pk %}"><button type="button" class="btn btn-danger"><i class="bi bi-trash"></i>Delete</button></a>&nbsp;&nbsp;<a href="{% url 'view_user_ssls' item.pk %}"><button type="button" class="btn btn-success"><i class="bi bi-pencil-square"></i>Detail</button></a></td>
+      </tr>
+    {% endfor %}
+  </tbody>
+</table>
+
+{% endblock %}

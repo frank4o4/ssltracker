@@ -1,0 +1,52 @@
+{% extends 'ssltracker/base.html' %}
+
+{% load bootstrap5 %}
+
+{% block content %}
+
+ <h1>Domains that have not been updated</h1>
+
+<p>&nbsp;</p>
+<p>&nbsp;</p>
+
+ <p>&nbsp;</p>
+  <table class="table table-striped">
+    <thead>
+      <tr>
+        <th scope="col">Domain Name</th>
+        <th scope="col">Expiry Date</th>
+        <th scope="col">SSL Issuer</th>
+        <th scope="col">SSL Cert Signed By</th>
+        <th scope="col">Days Left</th>
+        <th scope="col">Last Checked</th>
+        <th scope="col">Actions</th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for item in page_obj %}
+        <tr>
+          <td>{{ item.domain_name }}</td>
+          <td>{{ item.expires }}</td>
+          <td>{{ item.ssl_issuer_organization }}</td>
+          <td>{{ item.ssl_issuer_common_name }}</td>
+          <td>{{ item.days_left }}</td>
+          <td>{{ item.last_updated }}</td>
+          <td><a href="{% url 'edit_domain' item.pk %}"><button type="button" class="btn btn-primary"><i class="bi bi-pencil-square"></i>Edit</button></a>&nbsp;&nbsp;<a href="{% url 'delete_domain' item.pk %}"><button type="button" class="btn btn-danger"><i class="bi bi-trash"></i>Delete</button></a>&nbsp;&nbsp;<a href="{% url 'view_ssl' item.pk %}"><button type="button" class="btn btn-success"><i class="bi bi-pencil-square"></i>View</button></a></td>
+        </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+
+<!-- Pagination links -->
+<div class="pagination">
+  {% if page_obj.has_previous %}
+    &nbsp;<a href="?page={{ page_obj.previous_page_number }}">Previous Page</a>&nbsp;
+  {% endif %}
+
+  <span class="current-page">{{ page_obj.number }}</span>
+
+  {% if page_obj.has_next %}
+    &nbsp;<a href="?page={{ page_obj.next_page_number }}">Next Page</a>
+  {% endif %}
+</div>
+{% endblock %}

@@ -1,0 +1,21 @@
+{% extends 'ssltracker/base.html' %}
+{% block content %}
+
+<h3>SSLTracker Settings</h3>
+<p>&nbsp;</p>
+<p>Make sure to include a <b>,</b> as a space value.</p> 
+<p><b>SSL PORTS</b> is used to tell which https port to check, for example some applications run on custom ports like 8443 or 8080.</p>
+<p><b>Expiry Date Check</b> is used to define which dates to send out reminders, for example 30,15,5 would be 30 days left, 15 days left, and 5 days left</p>
+
+<p>&nbsp;</p>
+<p>&nbsp;</p>
+<div class="form-group">
+<form method="post">
+    {% csrf_token %}
+    {{ form.as_p }}
+    <button type="submit">Save</button>
+  </form>
+</div>
+  
+
+  {% endblock %}

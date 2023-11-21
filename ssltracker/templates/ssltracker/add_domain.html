@@ -1,0 +1,12 @@
+{% extends 'ssltracker/base.html' %}
+
+{% block content %}
+  <h2>Add Domain</h2>
+  <div class="form-group">
+  <form method="POST">
+    {% csrf_token %}
+    {{ form.as_p }}
+    <button type="submit">Submit</button>
+  </form>
+</div>
+{% endblock %}

@@ -1,0 +1,12 @@
+{% extends 'ssltracker/base.html' %}
+
+{% block content %}
+  <h1>Import CSV Data</h1>
+  <form method="post" action="{% url 'import_csv' %}" enctype="multipart/form-data">
+      {% csrf_token %}
+      <label for="csv_file">Choose CSV File:</label>
+      <input type="file" name="csv_file" accept=".csv" required>
+      <br>
+      <button type="submit">Import CSV</button>
+  </form>
+{% endblock %}

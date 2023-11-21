@@ -1,0 +1,16 @@
+<!-- add_user.html -->
+
+{% extends 'ssltracker/base.html' %}
+
+{% block content %}
+  <h2>Add User</h2>
+  <form method="post" action="{% url 'register_user' %}">
+    {% csrf_token %}
+    {{ form.as_p }}
+    <button type="submit">Add User</button>
+  </form>
+
+  {% if form.errors %}
+    <p class="error">There was an error in the form. Please correct it.</p>
+  {% endif %}
+{% endblock %}

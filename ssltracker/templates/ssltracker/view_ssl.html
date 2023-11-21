@@ -1,0 +1,63 @@
+{% extends 'ssltracker/base.html' %}
+
+{% load bootstrap5 %}
+
+{% block content %}
+
+<p>&nbsp;</p>
+<p>&nbsp;</p>
+<table class="table table-striped">
+  <tbody>
+    <tr>
+      <th scope="row">Domain Name</th> 
+      <td>{{ data.domain_name }}</td>
+    </tr>
+    <tr>
+      <th scope="row">SANS</th> 
+      <td>{{ data.sans }}</td>
+    </tr>
+    <tr>
+      <th scope="row">SSL Issuer Organization</th>
+      <td>{{ data.ssl_issuer_organization }}</td>
+    </tr>
+    <tr>
+      <th scope="row">SSL Issuer Common Name</th>
+      <td>{{ data.ssl_issuer_common_name }}</td>
+    </tr>
+    <tr>
+      <th scope="row">Expires</th>
+      <td>{{ data.expires }}</td>
+    </tr>
+    <tr>
+      <th scope="row">Days Left</th>
+      <td>{{ data.days_left }}</td>
+    </tr>
+    <tr>
+      <th scope="row">IP Address</th>
+      <td>{{ data.ipAddress }}</td>
+    </tr>
+    <tr>
+      <th scope="row">Cert Installation on</th>
+      <td>{{ data.certLocation }}</td>
+    </tr>
+    <tr>
+      <th scope="row">Last Updated</th>
+      <td>{{ data.last_updated }}</td>
+    </tr>
+    <tr>
+      <th scope="row">Contact Users</th>
+      <td>
+        <ul class="list-group list-group-flush">
+          {% for contact in contacts %}
+            <li class="list-group-item">
+              {{ contact.first_name }} {{ contact.last_name }} - {{ contact.email }}
+            </li>
+          {% endfor %}
+        </ul>
+      </td>
+    </tr>
+    
+  </tbody>
+</table>
+
+{% endblock %}

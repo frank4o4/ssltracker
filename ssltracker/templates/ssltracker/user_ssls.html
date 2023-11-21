@@ -1,0 +1,23 @@
+{% extends 'ssltracker/base.html' %}
+
+
+{% block content %}
+
+<p>&nbsp;</p>
+<h2>SSLs associated with {{ user.first_name }} {{ user.last_name }}</h2>
+<a href="{% url 'associate_contact_with_domains' user.pk %}">Edit Domains Notification for this user</a>
+<p>&nbsp;</p>
+<ul class="list-group">
+  {% for ssl in ssls %}
+    <li class="list-group-item">
+      Domain Name: {{ ssl.domain_name }}<br>
+      SSL Issuer Organization: {{ ssl.ssl_issuer_organization }}<br>
+      Expires: {{ ssl.expires }}
+      <!-- Add any other SSL-related information you want to display -->
+    </li>
+  {% endfor %}
+</ul>
+
+
+
+{% endblock %}

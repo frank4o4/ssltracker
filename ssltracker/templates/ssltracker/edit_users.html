@@ -1,0 +1,13 @@
+
+{% extends 'ssltracker/base.html' %}
+
+{% block content %}
+  <h2>Edit Users</h2>
+  
+  <form method="post" action="{% url 'edit_users' user.id %}">
+    {% csrf_token %}
+    {{ form.as_p }}
+    <button type="submit">Save</button>
+  </form>
+  
+{% endblock %}
