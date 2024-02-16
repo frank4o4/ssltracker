@@ -1,19 +1,22 @@
 from django.shortcuts import render, redirect,get_object_or_404
+from django.utils.decorators import method_decorator
 from django.contrib.auth.decorators import login_required
 from django.contrib.auth import logout as auth_logout
-from .models import domainlist,contacts,ssl_settings
+from .models import domainlist,contacts,ssl_settings,ssl_logs
 from django.contrib.auth.models import User
 from .decorators import group_required
 from django.db.models import F
 from django.contrib.auth.decorators import login_required
 from django.contrib.auth import logout
-from .utils import update_ssl,check_expiry,update_ipAddress
-from .forms import DomainListForm, ContactListForm,SSLSettingsForm,DomainEditForm,ContactAssociationForm,AddUserForm,UserEditForm
+from .utils import check_ssl,update_ssl,check_expiry,update_ipAddress,digiApiGet,digiCleanTable,update_domainlist_from_digicert
+from .forms import DomainListForm, ContactListForm,SSLSettingsForm,DomainEditForm,ContactAssociationForm,AddUserForm,UserEditForm,CustomPasswordChangeForm
 from django.core.paginator import Paginator
 from django.db.models import Q
-from datetime import datetime
+import datetime
 import csv
 from django.http import HttpResponse
+from django.db import IntegrityError
+from django.contrib.auth.views import PasswordChangeView
 
 @login_required
 def index(request):
@@ -49,8 +52,41 @@ def index(request):
     
     return render(request, 'ssltracker/home.html', context)
 
+@login_required
+@group_required('Admins')
+def view_logs(request):
+      
+    data = ssl_logs.objects.all().order_by(F('log_date').desc(nulls_last=True))
+    # Set the number of records per page
+    records_per_page = 25
+
+    # Create a Paginator object
+    paginator = Paginator(data, records_per_page)
+
+    # Get the current page number from the request's GET parameters
+    page_number = request.GET.get('page')
+
+    # Get the Page object for the requested page number
+    page_obj = paginator.get_page(page_number)
+
+    # Pass the page object and search query to the template
+    context = {
+        'page_obj': page_obj,
+        
+    }
+
+    unchecked_count = unchecked_notification(request)  # Pass the 'request' object
+    context['unchecked_notification_count'] = unchecked_count
+
+    
+    return render(request, 'ssltracker/logs.html', context)
+
+
 def login_view(request):
     return render(request, 'ssltracker/login.html')
+
+
+   
 
 def logout_view(request):
     auth_logout(request)
@@ -60,15 +96,12 @@ def logout_view(request):
 @group_required('Admins', 'Dashboard')
 @login_required
 def update_ssl_view(request):
+    digiCleanTable()
+    digiApiGet()
+    update_domainlist_from_digicert()
     update_ssl()
-    return redirect('index')
-
-@group_required('Admins', 'Dashboard')
-@login_required
-def update_ip_view(request):
     update_ipAddress()
     return redirect('index')
-
 
 
 @group_required('Admins', 'Dashboard')
@@ -83,13 +116,27 @@ def add_domain(request):
     if request.method == 'POST':
         form = DomainListForm(request.POST)
         if form.is_valid():
-            form.save()
+            # Save the form data
+            domain_instance = form.save()
+
+            # Log the information
+            now = datetime.datetime.now()
+            log_entry = ssl_logs(
+                log_date=datetime.datetime.now().date(),
+                log_time=now.strftime("%H:%M:%S"),
+                user=request.user.username,  # Assuming user is logged in
+                log_data=f"Domain added: {domain_instance.domain_name}"
+            )
+            log_entry.save()
+
             return redirect('index')
+    
     else:
         form = DomainListForm()
-    
+
     context = {'form': form}
     return render(request, 'ssltracker/add_domain.html', context)
+
 
 @group_required('Admins', 'Dashboard')
 @login_required
@@ -98,7 +145,18 @@ def edit_domain(request, pk):
     if request.method == 'POST':
         form = DomainEditForm(request.POST, instance=domain)
         if form.is_valid():
-            form.save()
+            domain_instance = form.save()
+
+            # Log the information
+            now = datetime.datetime.now()
+            log_entry = ssl_logs(
+                log_date=datetime.datetime.now().date(),
+                log_time=now.strftime("%H:%M:%S"),
+                user=request.user.username,  # Assuming user is logged in
+                log_data=f"Domain Edit: {domain_instance.domain_name}"
+            )
+            log_entry.save()
+
             return redirect('index')
     else:
         form = DomainEditForm(instance=domain)
@@ -110,7 +168,19 @@ def edit_domain(request, pk):
 @login_required
 def delete_domain(request, pk):
     domain = domainlist.objects.get(id=pk)
-    domain.delete()
+    domain_name = domain.domain_name
+    domain_instance = domain.delete()
+    
+    # Log the information
+    now = datetime.datetime.now()
+    log_entry = ssl_logs(
+        log_date=datetime.datetime.now().date(),
+        log_time=now.strftime("%H:%M:%S"),
+        user=request.user.username,  # Assuming user is logged in
+        log_data=f"Domain Deleted: {domain_name}"
+    )
+    log_entry.save()
+    
     return redirect('index')
 
 @group_required('Admins', 'Readers', 'Dashboard')
@@ -127,7 +197,17 @@ def add_contact(request):
     if request.method == 'POST':
         form = ContactListForm(request.POST)
         if form.is_valid():
-            form.save()
+            contact_add = form.save()
+            # Log the information
+            now = datetime.datetime.now()
+            log_entry = ssl_logs(
+                log_date=datetime.datetime.now().date(),
+                log_time=now.strftime("%H:%M:%S"),
+                user=request.user.username,  # Assuming user is logged in
+                log_data=f"Contact Added: {contact_add.first_name} {contact_add.last_name} {contact_add.email}"
+            )
+            log_entry.save()
+
             return redirect('list_contacts')
     else:
         form = ContactListForm()
@@ -174,7 +254,17 @@ def edit_contact(request, pk):
     if request.method == 'POST':
         form = ContactListForm(request.POST, instance=domain)
         if form.is_valid():
-            form.save()
+            contact_edit = form.save()
+            # Log the information
+            now = datetime.datetime.now()
+            log_entry = ssl_logs(
+                log_date=datetime.datetime.now().date(),
+                log_time=now.strftime("%H:%M:%S"),
+                user=request.user.username,  # Assuming user is logged in
+                log_data=f"Contact Edit: {contact_edit.first_name} {contact_edit.last_name} {contact_edit.email}"
+            )
+            log_entry.save()
+
             return redirect('list_contacts')
     else:
         form = ContactListForm(instance=domain)
@@ -186,7 +276,20 @@ def edit_contact(request, pk):
 @login_required
 def delete_contact(request, pk):
     contact = contacts.objects.get(id=pk)
-    contact.delete()
+    first_name = contact.first_name
+    last_name = contact.last_name
+    email = contact.email
+    contact_delete = contact.delete()
+    # Log the information
+    now = datetime.datetime.now()
+    log_entry = ssl_logs(
+        log_date=datetime.datetime.now().date(),
+        log_time=now.strftime("%H:%M:%S"),
+        user=request.user.username,  # Assuming user is logged in
+        log_data=f"Contact Deleted: {first_name} {last_name} {email} "
+    )
+    log_entry.save()
+
     return redirect('list_contacts')
 
 @group_required('Admins')
@@ -207,14 +310,14 @@ def edit_ssl_settings(request):
 @group_required('Admins', 'Readers', 'Dashboard')
 @login_required
 def unchecked_notification(request):
-    today = datetime.today().date()
+    today = datetime.datetime.today().date()
     unchecked_count = domainlist.objects.exclude(last_updated=today).count()
     return unchecked_count
 
 @group_required('Admins', 'Readers', 'Dashboard')
 @login_required
 def view_unchecked_ssls(request):
-    today = datetime.today().date()
+    today = datetime.datetime.today().date()
     unchecked_ssls = domainlist.objects.exclude(last_updated=today)
    
     # Set the number of records per page
@@ -237,50 +340,16 @@ def view_unchecked_ssls(request):
     return render(request, 'ssltracker/unchecked_ssls.html', context)
 
 
+@group_required('Admins', 'Dashboard')
+@login_required
+def update_unchecked_ssls(request):
+    today = datetime.datetime.today().date()
+    unchecked_ssls = domainlist.objects.exclude(last_updated=today)
+    for domain_record in unchecked_ssls:
+        domain_name = domain_record.domain_name
+        check_ssl(domain_name)
 
-def import_from_csv(request):
-    if request.method == 'POST' and request.FILES.get('csv_file'):
-        csv_file = request.FILES['csv_file']
-        decoded_file = csv_file.read().decode('utf-8')
-        csv_data = csv.reader(decoded_file.splitlines(), delimiter=',')
-
-        for row in csv_data:
-            if len(row) >= 3:
-                id, domain_name, certLocation = row[0], row[1], row[2]
-                domain, created = domainlist.objects.get_or_create(
-                    id=id,
-                    defaults={
-                        'domain_name': domain_name,
-                        'certLocation': certLocation,
-                    }
-                )
-        
-        return redirect('import_csv')
-
-    return render(request, 'ssltracker/import_csv.html')
-
-def import_from_csv2(request):
-    if request.method == 'POST' and request.FILES.get('csv_file'):
-        csv_file = request.FILES['csv_file']
-        decoded_file = csv_file.read().decode('utf-8')
-        csv_data = csv.reader(decoded_file.splitlines(), delimiter=',')
-
-        for row in csv_data:
-            if len(row) >= 4:  # Make sure you have enough fields in the CSV row
-                id, first_name, middle_name, last_name, email = row
-                contact, created = contacts.objects.get_or_create(
-                    id=id,
-                    defaults={
-                        'first_name': first_name,
-                        'middle_name': middle_name,
-                        'last_name': last_name,
-                        'email': email,
-                    }
-                )
-        
-        return redirect('import_contacts')  # Redirect to the same page or a different page after importing
-
-    return render(request, 'ssltracker/import_contacts.html')
+    return redirect('index')
 
 
 @login_required
@@ -289,13 +358,30 @@ def register_user(request):
     if request.method == 'POST':
         form = AddUserForm(request.POST)
         if form.is_valid():
-            form.save()
+            add_user = form.save()
+             # Log the information
+            now = datetime.datetime.now()
+            log_entry = ssl_logs(
+                log_date=datetime.datetime.now().date(),
+                log_time=now.strftime("%H:%M:%S"),
+                user=request.user.username,  # Assuming user is logged in
+                log_data=f"User Added: {add_user.first_name} {add_user.last_name} {add_user.email} {add_user.groups}"
+            )
+            log_entry.save()
             # Redirect to a success page or other desired view
             return redirect('register_user')
     else:
         form = AddUserForm()
 
     return render(request, 'ssltracker/add_user.html', {'form': form})
+
+
+@method_decorator(login_required, name='dispatch')
+class CustomPasswordChangeView(PasswordChangeView):
+
+    def form_valid(self, form):
+        response = super().form_valid(form)
+        return response
 
 @login_required
 @group_required('Admins')
@@ -316,8 +402,17 @@ def edit_users(request, user_id):
     if request.method == 'POST':
         form = UserEditForm(request.POST, instance=user)
         if form.is_valid():
-            form.save()
-            return redirect('edit_users', user.id)
+            edit_user = form.save()
+        # Log the information
+        now = datetime.datetime.now()
+        log_entry = ssl_logs(
+        log_date=datetime.datetime.now().date(),
+        log_time=now.strftime("%H:%M:%S"),
+        user=request.user.username,  # Assuming user is logged in
+        log_data=f"User Edit: {edit_user.first_name} {edit_user.last_name} {edit_user.email} "
+        )
+        log_entry.save()
+        return redirect('list_users')
     else:
         form = UserEditForm(instance=user)
 
@@ -329,8 +424,23 @@ def edit_users(request, user_id):
 @group_required('Admins')
 def delete_user(request, user_id):
     user = get_object_or_404(User, id=user_id)
+    first_name = user.first_name
+    last_name = user.last_name
+    email = user.email
     user.delete()
+    # Log the information
+    now = datetime.datetime.now()
+    log_entry = ssl_logs(
+    log_date=datetime.datetime.now().date(),
+    log_time=now.strftime("%H:%M:%S"),
+    user=request.user.username,  # Assuming user is logged in
+    log_data=f"User Deleted: {first_name} {last_name} {email} "
+    )
+    log_entry.save()
     return redirect('list_users')
+
+
+
 
 
 
@@ -373,5 +483,55 @@ def export_csv_contacts(request):
                              obj.email])
 
     return response
+
+
+
+## Remove for production
+
+@login_required
+@group_required('Admins')
+def import_from_csv(request):
+    if request.method == 'POST' and request.FILES.get('csv_file'):
+        csv_file = request.FILES['csv_file']
+        decoded_file = csv_file.read().decode('utf-8')
+        csv_data = csv.reader(decoded_file.splitlines(), delimiter=',')
+
+        for row in csv_data:
+            if len(row) >= 2:
+                domain_name, cert_location = row[:2]
+
+                # Create a new domainlist without specifying the id
+                domain, created = domainlist.objects.get_or_create(
+                    domain_name=domain_name,
+                    certLocation=cert_location,
+                )
+
+        return redirect('import_csv')
+
+    return render(request, 'ssltracker/import_csv.html')
+
+@login_required
+@group_required('Admins')
+def import_from_csv2(request):
+    if request.method == 'POST' and request.FILES.get('csv_file'):
+        csv_file = request.FILES['csv_file']
+        decoded_file = csv_file.read().decode('utf-8')
+        csv_data = csv.reader(decoded_file.splitlines(), delimiter=',')
+
+        for row in csv_data:
+            if len(row) >= 4:  # Make sure you have enough fields in the CSV row
+                first_name, middle_name, last_name, email = row[:4]
+
+                # Create a new contacts without specifying the id
+                contact, created = contacts.objects.get_or_create(
+                    first_name=first_name,
+                    middle_name=middle_name,
+                    last_name=last_name,
+                    email=email,
+                )
+
+        return redirect('import_contacts')  # Redirect to the same page or a different page after importing
+
+    return render(request, 'ssltracker/import_contacts.html')
 
 

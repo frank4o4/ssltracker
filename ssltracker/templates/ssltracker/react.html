@@ -1,0 +1,39 @@
+<!-- Include Material-UI CSS in your Django template -->
+<link rel="stylesheet" href="https://fonts.googleapis.com/css?family=Roboto:300,400,500,700&display=swap" />
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@material-ui/core@4.12.3/dist/css/material-ui.min.css" />
+
+<!-- Your Django template with Material-UI components -->
+<body>
+  <div id="app"></div>
+
+  <!-- Include Babel for JSX transpilation -->
+  <script src="https://cdn.jsdelivr.net/npm/babel-standalone@6.26.0/babel.min.js"></script>
+
+  <!-- Include React and ReactDOM -->
+  <script src="https://cdn.jsdelivr.net/npm/react@17.0.2/umd/react.development.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/react-dom@17.0.2/umd/react-dom.development.js"></script>
+
+  <!-- Include Material-UI components -->
+  <script src="https://cdn.jsdelivr.net/npm/@material-ui/core@4.12.3/dist/umd/material-ui.production.min.js"></script>
+
+  <script type="text/babel">
+    // Your React component with Material-UI components
+    const { AppBar, Toolbar, Typography } = MaterialUI;
+
+    function Navigation() {
+      return (
+        <AppBar position="static">
+          <Toolbar>
+            <Typography variant="h6">
+              SSL Tracker
+            </Typography>
+            {/* Add your Material-UI components here */}
+          </Toolbar>
+        </AppBar>
+      );
+    }
+
+    // Render the React component in the specified element
+    ReactDOM.render(<Navigation />, document.getElementById('app'));
+  </script>
+</body>

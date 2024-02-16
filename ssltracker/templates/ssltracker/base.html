@@ -1,5 +1,5 @@
 
-     <!DOCTYPE html>
+<!DOCTYPE html>
 <html>
 <head>
   <title>{% block title %}{% endblock %}</title>
@@ -11,6 +11,7 @@
       padding-left: 20px;
       padding-top:20px;
     }
+
   </style>
 </head>
 <body>
@@ -52,21 +53,29 @@
             <a class="nav-link" href="{% url 'edit_ssl_settings' %}">Settings</a>
           </li>
           <li class="nav-item">
-          <a class="nav-link" href="{% url 'logout' %}">Logout</a>
-        </li>
+            <a class="nav-link" href="{% url 'view_logs' %}">View Logs</a>
+          </li>
+        </ul>
     
-        {% else %}
-        <li class="nav-item">
-          <a class="nav-link" href="{% url 'login' %}">Login</a>
-        </li>
+        <ul class="ms-auto">
+          <li class="nav-item dropdown">
+            <a class="nav-link dropdown-toggle" href="#" role="button" data-bs-toggle="dropdown" aria-expanded="false">Account Settings</a>
+            <ul class="dropdown-menu">
+              <li><a class="dropdown-item" href="{% url 'password_change' %}">Change Password</a></li>
+              <li><a class="dropdown-item" href="{% url 'logout' %}">Logout</a></li>
+            </ul>
+          </li>
+        </ul>
+        
         {% endif %}
-      </ul>
+    
     </div>
   </nav>
 
 
     <main>
         {% block content %}
+        
         {% endblock %}
     </main>
 

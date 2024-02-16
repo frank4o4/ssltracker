@@ -3,6 +3,7 @@ from .models import domainlist, contacts,ssl_settings
 from django.forms import ModelForm, TextInput, EmailInput,Select,CheckboxInput
 from django.contrib.auth.forms import UserCreationForm
 from django.contrib.auth.models import User,Group
+from django.contrib.auth.forms import PasswordChangeForm
 
 class DomainListForm(forms.ModelForm):
     class Meta:
@@ -73,7 +74,16 @@ class ContactListForm(forms.ModelForm):
 class SSLSettingsForm(forms.ModelForm):
     class Meta:
         model = ssl_settings
-        fields = ['ssl_ports', 'expiry_date_check']
+        fields = ['ssl_ports', 'expiry_date_check',
+                  'digicert_api_key',
+                  'digicert_api_url',
+                  'digicert_account_id',
+                  'msgraph_client_id',
+                  'msgraph_client_secret',
+                  'msgraph_tenant_id',
+                  'msgraph_api_url',
+                  'msgraph_api_version',
+                  ]
         
         widgets = {
             'ssl_ports': TextInput(attrs={
@@ -83,7 +93,39 @@ class SSLSettingsForm(forms.ModelForm):
             'expiry_date_check': TextInput(attrs={
                 'class': "form-control",
                 'style': 'max-width: 300px;',
-                })
+                }),
+            'digicert_api_key': TextInput(attrs={
+                'class': "form-control",
+                'style': 'max-width: 800px;',
+                }),
+            'digicert_api_url': TextInput(attrs={
+                'class': "form-control",
+                'style': 'max-width: 800px;',
+                }),
+            'digicert_account_id': TextInput(attrs={
+                'class': "form-control",
+                'style': 'max-width: 800px;',
+                }),
+            'msgraph_client_id': TextInput(attrs={
+                'class': "form-control",
+                'style': 'max-width: 800px;',
+                }),
+            'msgraph_client_secret': TextInput(attrs={
+                'class': "form-control",
+                'style': 'max-width: 800px;',
+                }),
+            'msgraph_tenant_id': TextInput(attrs={
+                'class': "form-control",
+                'style': 'max-width: 800px;',
+                }),
+            'msgraph_api_url': TextInput(attrs={
+                'class': "form-control",
+                'style': 'max-width: 800px;',
+                }),
+            'msgraph_api_version': TextInput(attrs={
+                'class': "form-control",
+                'style': 'max-width: 300px;',
+                }),
          }
 
 
@@ -141,3 +183,22 @@ class UserEditForm(forms.ModelForm):
     class Meta:
         model = User
         fields = ['username', 'first_name', 'last_name', 'email', 'groups']
+
+
+
+
+class CustomPasswordChangeForm(PasswordChangeForm):
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+
+        # Customize the form fields or add extra customization
+        self.fields['old_password'].label = 'Current Password'
+        self.fields['new_password1'].label = 'New Password'
+        self.fields['new_password2'].label = 'Confirm New Password'
+
+        for field_name in ['old_password', 'new_password1', 'new_password2']:
+            self.fields[field_name].widget = TextInput(attrs={
+                'class': "form-control",
+                'style': 'max-width: 300px;',
+                'placeholder': self.fields[field_name].label,
+            })

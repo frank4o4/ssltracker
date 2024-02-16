@@ -153,7 +153,9 @@ LOGIN_URL = '/login/'
 CSRF_TRUSTED_ORIGINS = ['http://nyrhdv295.cusa.canon.com','http://10.140.137.77']
 
 CRONJOBS = [
-    ('0 7 * * *', 'ssltracker.views.update_ssl'),
-#    ('0 8 * * *', 'ssltracker.views.email_users','>> /home/ssltracker/InfraHub/emaillogfile.log')
+   ('0 5 * * *', 'ssltracker.views.digiCleanTable'),
+    ('10 5 * * *', 'ssltracker.views.digiApiGet'),
+    ('15 5 * * *', 'ssltracker.views.update_ssl'),
+    ('0 7 * * *', 'ssltracker.views.update_ipAddress'),
  ]
 

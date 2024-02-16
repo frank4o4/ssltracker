@@ -9,8 +9,8 @@ from django import forms
 #
 class domainlist(models.Model):
     id = models.AutoField(primary_key=True)
-    domain_name = models.CharField(max_length=255)
-    sans = models.TextField()
+    domain_name = models.CharField(max_length=255, unique=True)
+    sans = models.TextField(null=True, blank=True)
     ssl_issuer_organization =  models.CharField(max_length=255,null=True)
     ssl_issuer_common_name =  models.CharField(max_length=255,null=True)
     expires = models.CharField(max_length=255,null=True)
@@ -19,9 +19,19 @@ class domainlist(models.Model):
     contact_users = models.ManyToManyField('contacts')
     certLocation =  models.CharField(max_length=255,null=True)
     ipAddress =  models.CharField(max_length=255,null=True)
+    
 
     def __str__(self):
         return self.domain_name
+
+class digicert(models.Model):
+    cert_id = models.CharField(max_length=255)
+    cn = models.CharField(max_length=255)
+    san = models.TextField(null=True, blank=True)
+    valid_from = models.CharField(max_length=255,null=True)
+    expiry_date = models.CharField(max_length=255,null=True)
+    last_updated = models.CharField(max_length=50,null=True)
+
 
 class contacts(models.Model):
     id = models.AutoField(primary_key=True)
@@ -37,6 +47,14 @@ class ssl_settings(models.Model):
     id = models.AutoField(primary_key=True)
     ssl_ports = models.CharField(max_length=255)
     expiry_date_check = models.CharField(max_length=255)
+    digicert_api_key = models.CharField(max_length=255,default="digi cert api key")
+    digicert_account_id = models.CharField(max_length=255,default="digi cert account id")
+    digicert_api_url =  models.CharField(max_length=255,default="https://daas.digicert.com/apicontroller/v1/certificate/list")
+    msgraph_client_id = models.CharField(max_length=255,default="MSGRAPH client ID")
+    msgraph_client_secret = models.CharField(max_length=255, default="MSGRAPH client secret")
+    msgraph_tenant_id = models.CharField(max_length=255, default="MSGRAPH tenant ID")
+    msgraph_api_url =  models.CharField(max_length=255, default="https://graph.microsoft.com")
+    msgraph_api_version =  models.CharField(max_length=15, default="v1.0")
 
 class ssl_logs(models.Model):
     id = models.AutoField(primary_key=True)
@@ -44,7 +62,9 @@ class ssl_logs(models.Model):
     log_time = models.CharField(max_length=255)
     user = models.CharField(max_length=255)
     log_data = models.CharField(max_length=255)
-   
+
+
+
 
 #
 # Group Models
@@ -61,6 +81,12 @@ def create_groups(sender, **kwargs):
     dashboard_group, created = CustomGroup.objects.get_or_create(name='Dashboard')
     readers_group, created = CustomGroup.objects.get_or_create(name='Readers')
 
+
+@receiver(post_migrate)
+def create_sslsettings(sender, **kwargs):
+    #Create SSL default settings
+    default_ssl_settings, created = ssl_settings.objects.get_or_create(ssl_ports='443',expiry_date_check='5,15,30')
+    
 
 class UserEditForm(forms.ModelForm):
     groups = forms.ModelChoiceField(queryset=Group.objects.all(), required=True)

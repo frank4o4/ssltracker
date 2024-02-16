@@ -2,11 +2,16 @@
 
 {% block content %}
   <h2>Edit Contact</h2>
-  <div class="form-group">
+ 
   <form method="POST">
     {% csrf_token %}
-    {{ form.as_p }}
-    <button type="submit">Update</button>
-  </form>
-</div>
+    <table border="0" cellpadding="5" cellspacing="0">
+      {{ form.as_table }}
+      <tr>
+          <td>&nbsp;</td>
+          <td><button type="submit" class="btn btn-primary">Edit Contact</button></td>
+      </tr>
+  </table>
+</form>
+
 {% endblock %}
