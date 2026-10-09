@@ -1,88 +1,9 @@
-{% extends 'ssltracker/base.html' %}
-
-{% load bootstrap5 %}
-
-{% block content %}
-
-          {% if unchecked_notification_count > 0 %}
-          <div class="alert alert-danger" role="alert">
-          Domains That need to be updated <a href="{% url 'unchecked_ssls' %}">{{ unchecked_notification_count }}</a>
-          </div>
-          {% endif %}
-
-<p>&nbsp;</p>
-<p>&nbsp;</p>
-<div class="row">
-  <div class="col-md-3">
-    <form method="get" action="{% url 'index' %}">
-      <div class="input-group">
-        <div class="input-group-prepend">
-          <span class="input-group-text">Search Domain</span>
-        </div>
-        <input type="text" class="form-control" placeholder="Enter domain name" name="search" value="{{ search_query }}">
-        <div class="input-group-append">&nbsp;
-          <button class="btn btn-primary" type="submit">Search</button>
-        </div>
-      </div>
-    </form>
-  </div>
-</div>
- <p>&nbsp;</p>
-  <table class="table table-striped">
-    <thead>
-      <tr>
-        <th scope="col">Domain Name</th>
-        <th scope="col">Expiry Date</th>
-        <th scope="col">SSL Issuer</th>
-        <th scope="col">SSL Cert Signed By</th>
-        <th scope="col">Days Left</th>
-        <th scope="col">Last Checked</th>
-        <th scope="col">Actions</th>
-      </tr>
-    </thead>
-    <tbody>
-      {% for item in page_obj %}
-        <tr>
-          <td>{{ item.domain_name }}</td>
-          <td>{{ item.expires }}</td>
-          <td>{{ item.ssl_issuer_organization }}</td>
-          <td>{{ item.ssl_issuer_common_name }}</td>
-          <td>{{ item.days_left }}</td>
-          <td>{{ item.last_updated }}</td>
-          <td><a href="{% url 'edit_domain' item.pk %}"><button type="button" class="btn btn-primary"><i class="bi bi-pencil-square"></i>Edit</button></a>&nbsp;&nbsp;<a href="{% url 'view_ssl' item.pk %}"><button type="button" class="btn btn-success"><i class="bi bi-pencil-square"></i>View</button></a>
-            <a href="{% url 'delete_domain' item.pk %}" onclick="confirmDelete(event)" class="btn btn-danger" role="button">
-              <i class="bi bi-pencil-square"></i>Delete
-            </a>
-            
-            <script>
-              function confirmDelete(event) {
-                event.preventDefault();  // Prevent the default behavior of the anchor tag
-                if (confirm('Are you sure you want to delete this domain?')) {
-                  window.location.href = event.target.href;
-                }
-              }
-            </script>
-          </td>
-        </tr>
-      {% endfor %}
-    </tbody>
-  </table>
-
-<!-- Pagination links -->
-<span class="text-primary">
-<nav aria-label="Page navigation">
-  <ul class="pagination">
-    {% if page_obj.has_previous %}
-      <li class="page-item"><a href="?page={{ page_obj.previous_page_number }}" class="page-link">Previous Page</a></li>
-    {% endif %}
-
-<!--    <li class="page-item">{{ page_obj.number }}</li> -->
-
-    {% if page_obj.has_next %}
-     &nbsp;&nbsp; <li class="page-item"><a href="?page={{ page_obj.next_page_number }}" class="page-link">Next Page</a></li>
-    {% endif %}
-  </ul>
-</nav>
-</span>
+{% extends 'ssltracker/base.html' %}{% block title %}Overview · SSL Tracker{% endblock %}{% block content %}
+<div class="page-head"><div><div class="eyebrow">CERTIFICATE OVERVIEW</div><h1>Your domains, at a glance.</h1><p>Keep track of certificate expiry and know what needs attention.</p></div><div class="actions">{% if can_manage %}<a class="btn" href="{% url 'add_domain' %}">{% include 'ssltracker/icon.html' with name='plus' %}Add domain</a><form method="post" action="{% url 'update_ssl' %}">{% csrf_token %}<button type="submit" class="btn btn-primary">{% include 'ssltracker/icon.html' with name='activity' %}{% if active_run %}View active scan{% else %}Run SSL scan{% endif %}</button></form>{% endif %}</div></div>
+<div class="stats"><a class="stat" href="?status=all"><span class="stat-label">Total domains</span><span class="stat-icon">{% include 'ssltracker/icon.html' with name='shield' %}</span><span class="stat-number">{{ stats.total }}</span><span class="stat-note">Your certificate inventory</span></a><a class="stat amber" href="?status=soon"><span class="stat-label">Expiring soon</span><span class="stat-icon">{% include 'ssltracker/icon.html' with name='clock' %}</span><span class="stat-number">{{ stats.soon }}</span><span class="stat-note">Within the next 30 days</span></a><a class="stat red" href="?status=expired"><span class="stat-label">Expired</span><span class="stat-icon">{% include 'ssltracker/icon.html' with name='activity' %}</span><span class="stat-number">{{ stats.expired }}</span><span class="stat-note">Based on recorded expiry dates</span></a><a class="stat teal" href="?status=unchecked"><span class="stat-label">Unchecked today</span><span class="stat-icon">{% include 'ssltracker/icon.html' with name='list' %}</span><span class="stat-number">{{ stats.unchecked }}</span><span class="stat-note">Awaiting a successful check</span></a></div>
+{% if active_run %}<div class="alert scan-banner"><div><strong>Scan #{{ active_run.pk }} is {{ active_run.status }}</strong><p>{{ active_run.completed }} of {{ active_run.total }} checked. You can keep working while the scan runs.</p></div><a class="btn btn-sm" href="{% url 'scan_detail' active_run.pk %}">View progress →</a></div>{% endif %}
+<section class="panel"><div class="panel-heading"><div><h2>Domain inventory <span class="count">{{ page_obj.paginator.count }}</span></h2><p>Certificate information from your last successful checks.</p></div>{% if can_admin %}<div class="actions"><a class="text-link" href="{% url 'import_csv' %}">Import CSV</a><a class="text-link" href="{% url 'export_csv_domainlist' %}">Export CSV ↓</a></div>{% endif %}</div>
+<div class="toolbar"><div class="tabs" aria-label="Filter domains"><a href="?status=all&amp;search={{ search_query|urlencode }}" class="{% if selected_status == 'all' %}selected{% endif %}">All domains</a><a href="?status=soon&amp;search={{ search_query|urlencode }}" class="{% if selected_status == 'soon' %}selected{% endif %}">Expiring soon</a><a href="?status=expired&amp;search={{ search_query|urlencode }}" class="{% if selected_status == 'expired' %}selected{% endif %}">Expired</a><a href="?status=unchecked&amp;search={{ search_query|urlencode }}" class="{% if selected_status == 'unchecked' %}selected{% endif %}">Unchecked</a></div><form class="search" method="get"><input type="hidden" name="status" value="{{ selected_status }}"><div class="search-field">{% include 'ssltracker/icon.html' with name='search' %}<label class="sr-only" for="domain-search">Search domains</label><input id="domain-search" name="search" placeholder="Search domains…" value="{{ search_query }}"></div><button type="submit" class="btn">Search</button></form></div>
+{% include 'ssltracker/domain_table.html' %}</section>
+{% if latest_run %}<p class="subtext">Latest scan: <a href="{% url 'scan_detail' latest_run.pk %}">#{{ latest_run.pk }} · {{ latest_run.status }}</a> · {{ latest_run.created_at }}. Expiry status reflects stored dates; see scan history for connection failures.</p>{% endif %}
 {% endblock %}
-

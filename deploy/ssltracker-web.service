@@ -1,0 +1,22 @@
+[Unit]
+Description=SSL Tracker web
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=ssltracker
+Group=ssltracker
+WorkingDirectory=/opt/ssltracker
+EnvironmentFile=/etc/ssltracker.env
+Environment=PYTHONUNBUFFERED=1
+ExecStart=/opt/ssltracker/.venv/bin/gunicorn --workers 2 --bind 127.0.0.1:8000 --access-logfile - ssltracker.wsgi:application
+Restart=on-failure
+RestartSec=5
+KillMode=control-group
+TimeoutStopSec=45
+NoNewPrivileges=true
+PrivateTmp=true
+
+[Install]
+WantedBy=multi-user.target

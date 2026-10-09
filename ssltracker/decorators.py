@@ -7,10 +7,10 @@ def group_required(*group_names):
     def decorator(view_func):
         @wraps(view_func)
         def _wrapped_view(request, *args, **kwargs):
-            if any(request.user.groups.filter(name=group).exists() for group in group_names):
+            if request.user.is_authenticated and (request.user.is_superuser or request.user.groups.filter(name__in=group_names).exists()):
                 return view_func(request, *args, **kwargs)
             else:
-                return render(request, 'ssltracker/access.html')
+                return render(request, 'ssltracker/access.html', status=403)
 
         return _wrapped_view
 

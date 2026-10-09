@@ -1,110 +1,25 @@
-import ssl
 import socket
 import datetime
 from .models import domainlist,ssl_settings,digicert
 import requests
-import socks
 import json
 
-def check_ssl(domain):
-    # Getting current date and time
-    current_date = datetime.datetime.now().date()
-    
-    digicert_record = digicert.objects.filter(cn=domain).first()
 
-    if digicert_record:
-        expires = digicert_record.expiry_date
-        sans = digicert_record.san
-        if sans is None:
-            sans = "Digi Inc"
-
-        # Ensure expires is a datetime.date object
-        if isinstance(expires, str):
-            expires = datetime.datetime.strptime(expires, "%Y-%m-%d").date()
-
-        # Calculating days left
-        delta = expires - current_date
-        days_left = delta.days
-        
-        update_record = domainlist.objects.filter(domain_name=domain).update(
-            sans = sans,
-            ssl_issuer_organization="DigiCert Inc",
-            expires = expires,
-            days_left = days_left,
-            last_updated = current_date
-        )
-        
-    else:
-        ssl_ports_string = ssl_settings.objects.values_list('ssl_ports', flat=True).first()
-        ssl_ports = [int(day) for day in ssl_ports_string.split(',')]
-
-        
-        try:
-            
-
-            # Creating an SSL context
-            ssl_context = ssl.create_default_context()
-
-            # Set up the SOCKS proxy
-            proxy_server = "mvcache.cusa.canon.com"
-            proxy_port=80
-            proxy = {
-                'proxy_type': socks.PROXY_TYPE_HTTP,
-                'addr': proxy_server,
-                'port': proxy_port,
-            }
-
-            # Iterating over the SSL ports
-            for port in ssl_ports:
-                try:
-                    # Establishing a connection with the domain on the current port through the proxy
-                    with socks.socksocket(socket.AF_INET, socket.SOCK_STREAM) as sock:
-                        sock.set_proxy(**proxy)
-                        sock.connect((domain, port))
-                        with ssl_context.wrap_socket(sock, server_hostname=domain) as ssock:
-                            # Retrieving SSL certificate information
-                            cert = ssock.getpeercert()
-                            expires = datetime.datetime.strptime(cert['notAfter'], "%b %d %H:%M:%S %Y %Z")
-                            sans_string = [entry[1] for entry in cert.get('subjectAltName', []) if entry[0] == 'DNS']
-                            sans = ', '.join(sans_string)  # Join the list elements into a string
-                            sans = sans.replace("[", "").replace("]", "")
-                            # Extracting issuer information
-                            issuer = dict(x[0] for x in cert['issuer'])
-                            issuer_organization = issuer.get('organizationName')
-                            issuer_common_name = issuer.get('commonName')
-                            
-
-                            # Calculating days left
-                            delta = expires.date() - current_date
-
-                            # Updating the domainlist model
-                            
-                        # Updating the domainlist model
-                            domainlist.objects.filter(domain_name=domain).update(
-                                expires=expires.date(),
-                                days_left=delta.days,
-                                last_updated=current_date,
-                                ssl_issuer_organization=issuer_organization,
-                                ssl_issuer_common_name=issuer_common_name,
-                                sans=sans,
-                            )
-
-                except socket.error:
-                    continue
-
-        except BaseException as err:
-            print(f"Unexpected {err=}, {type(err)=}")
-
-        finally:
-            print('Continue next domain')
+def direct_post(url, **kwargs):
+    with requests.Session() as session:
+        session.trust_env = False
+        return session.post(url, **kwargs)
 
 
 def update_ssl():
-    domain_names = domainlist.objects.values_list('domain_name', flat=True)
+    from .jobs import enqueue_scan
+    return enqueue_scan()
 
-    # For loop to update all domains
-    for domain_name in domain_names:
-        check_ssl(domain_name)
+
+def check_ssl(domain):
+    # Compatibility: do not bypass the global queue with ad-hoc writes.
+    return update_ssl()
+
 
 def check_expiry():
     expiry_days_string = ssl_settings.objects.values_list('expiry_date_check', flat=True).first()
@@ -128,11 +43,6 @@ def send_email_notification(domain_name,days_left,email_addresses):
     tenant_id = ssl_settings.objects.values_list('msgraph_tenant_id', flat=True).first()
     resource = ssl_settings.objects.values_list('msgraph_api_url', flat=True).first()
     api_version = ssl_settings.objects.values_list('msgraph_api_version', flat=True).first()
-    # client_id = "40830f72-35e9-405f-8ea7-b7d0c337fba0"
-    # client_secret = "NIz8Q~T1.VZQpNVbRK8Np2DD9fm.DJS5ym1-9aZQ"
-    # tenant_id = "5132013a-1c8d-4f87-9f4d-43110f5bc07b"
-    # resource = "https://graph.microsoft.com"
-    # api_version = "v1.0"
 
     # Construct the token endpoint URL
     token_url = f"https://login.microsoftonline.com/{tenant_id}/oauth2/token"
@@ -148,10 +58,13 @@ def send_email_notification(domain_name,days_left,email_addresses):
     subject = (f"{domain_name} will be Expiring in {days_left} days")
     message = (f"{domain_name} will be Expiring in {days_left} days")
     recription_list = email_addresses
-    From_Email="cci_apps_dev@canada.canon.com"
+    from django.conf import settings
+    From_Email = settings.MS_GRAPH_SENDER
+    if not From_Email:
+        raise ValueError('Set MS_GRAPH_SENDER before sending expiry notifications')
 
     # Request the access token
-    token_response = requests.post(token_url, data=token_payload)
+    token_response = direct_post(token_url, data=token_payload, timeout=(5, 30))
     token_data = token_response.json()
     access_token = token_data["access_token"]
 
@@ -184,7 +97,7 @@ def send_email_notification(domain_name,days_left,email_addresses):
         "Content-Type": "application/json"
     }
 
-    send_email_response = requests.post(send_email_endpoint, json=email_payload, headers=headers)
+    send_email_response = direct_post(send_email_endpoint, json=email_payload, headers=headers, timeout=(5, 30))
 
     if send_email_response.status_code == 202:
         print("Email sent successfully!")
@@ -203,76 +116,42 @@ def get_ip_address(domain_name):
 
 
 def update_ipAddress():
-    domain_names = domainlist.objects.values_list('domain_name', flat=True)
-    # For loop to update all domains
-    for domain_name in domain_names:
-        ipAddress = get_ip_address(domain_name)
-        domainlist.objects.filter(domain_name=domain_name).update(
-                            ipAddress=ipAddress
-                        ) 
+    return update_ssl()
+
 
 def digiCleanTable():
-    # Clean table First before fresh import
-    try:
-        digicert.objects.all().delete()
-        print("API Table Data deleted")
-    except Exception as e:
-        print(f"An error occurred: {e}")
-    
+    # Old cron compatibility: never delete inventory before a successful fetch.
+    return None
 
 
 def digiApiGet():
-    api_key = ssl_settings.objects.values_list('digicert_api_key', flat=True).first()
-    url = ssl_settings.objects.values_list('digicert_api_url', flat=True).first()
-    accountId = ssl_settings.objects.values_list('digicert_account_id', flat=True).first()
-
-    payload = {
-        "pageSize": 100,
-        "divisionIds": [],
-        "accountId": accountId,
-    }
-
-    # Convert the payload to JSON
-    payload_json = json.dumps(payload)
-
-    headers = {
-        'X-DC-DEVKEY': api_key,
-        'Content-Type': "application/json",
-    }
-
-    response = requests.request("POST", url, data=payload_json, headers=headers)
-
-    
-
-    if response.status_code == 200:
-        data = response.json()
-    
-    certificate_details_list = data.get('data', {}).get('certificateDetailsDTOList', [])
-
-    for certificate_details in certificate_details_list:
-        cert_id = certificate_details.get('certId', '')
-        cn = certificate_details.get('cn', '')
-        san  = certificate_details.get('san', '')
-        valid_from_timestamp = certificate_details.get('validFrom', 0)
-        expiry_date_timestamp = certificate_details.get('expiryDate', 0)
-
-        # Convert timestamp to datetime
-        valid_from = datetime.datetime.utcfromtimestamp(valid_from_timestamp / 1000).date()
-        expiry_date = datetime.datetime.utcfromtimestamp(expiry_date_timestamp / 1000).date()
-        today = datetime.datetime.now().date()
-
-        digi_update = digicert(
-            cert_id=cert_id,
-            cn=cn,
-            san=san,
-            valid_from=valid_from,
-            expiry_date=expiry_date,
-            last_updated=today
-        )
-        digi_update.save()
-        print("API Data uploaded")
-    else:
-        print("Error", response.status_code)
+    """Optional legacy inventory sync. Refuse potentially truncated responses."""
+    from django.db import transaction
+    row = ssl_settings.objects.order_by('pk').first()
+    if not row or not row.digicert_api_key or row.digicert_api_key == 'digi cert api key':
+        raise ValueError('DigiCert API credentials are not configured')
+    response = direct_post(row.digicert_api_url,
+        json={'pageSize': 100, 'divisionIds': [], 'accountId': row.digicert_account_id},
+        headers={'X-DC-DEVKEY': row.digicert_api_key}, timeout=(5, 30))
+    response.raise_for_status()
+    records = response.json()['data']['certificateDetailsDTOList']
+    if not isinstance(records, list) or len(records) >= 100:
+        raise ValueError('DigiCert may have more pages. Configure verified pagination before replacing inventory.')
+    if not records:
+        raise ValueError('Empty DigiCert response; existing inventory retained')
+    def date_from_ms(value):
+        return datetime.datetime.fromtimestamp(value / 1000, datetime.timezone.utc).date().isoformat()
+    objects = []
+    for item in records:
+        san = item.get('san') or ''
+        if isinstance(san, list):
+            san = ', '.join(san)
+        objects.append(digicert(cert_id=item['certId'], cn=item['cn'], san=san,
+            valid_from=date_from_ms(item['validFrom']), expiry_date=date_from_ms(item['expiryDate']),
+            last_updated=datetime.date.today().isoformat()))
+    with transaction.atomic():
+        digicert.objects.all().delete()
+        digicert.objects.bulk_create(objects)
 
 
 def update_domainlist_from_digicert():

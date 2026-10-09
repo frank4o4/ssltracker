@@ -76,6 +76,8 @@ class CustomGroup(Group):
 
 @receiver(post_migrate)
 def create_groups(sender, **kwargs):
+    if sender.name != 'ssltracker':
+        return
     # Create groups if they don't exist
     admin_group, created = CustomGroup.objects.get_or_create(name='Admins')
     dashboard_group, created = CustomGroup.objects.get_or_create(name='Dashboard')
@@ -85,7 +87,8 @@ def create_groups(sender, **kwargs):
 @receiver(post_migrate)
 def create_sslsettings(sender, **kwargs):
     #Create SSL default settings
-    default_ssl_settings, created = ssl_settings.objects.get_or_create(ssl_ports='443',expiry_date_check='5,15,30')
+    if sender.name == 'ssltracker' and not ssl_settings.objects.exists():
+        ssl_settings.objects.create(ssl_ports='443', expiry_date_check='5,15,30')
     
 
 class UserEditForm(forms.ModelForm):
@@ -94,3 +97,34 @@ class UserEditForm(forms.ModelForm):
     class Meta:
         model = User
         fields = ['username', 'first_name', 'last_name', 'email', 'groups']
+
+class ScanRun(models.Model):
+    # NULL permits historical rows; the unique value 1 is the global queue lock.
+    active_slot = models.PositiveSmallIntegerField(null=True, unique=True, editable=False)
+    mode = models.CharField(max_length=12, default='all')
+    status = models.CharField(max_length=16, default='queued')
+    requested_by = models.ForeignKey(User, null=True, blank=True, on_delete=models.SET_NULL)
+    created_at = models.DateTimeField(auto_now_add=True)
+    started_at = models.DateTimeField(null=True)
+    heartbeat_at = models.DateTimeField(null=True)
+    finished_at = models.DateTimeField(null=True)
+    total = models.PositiveIntegerField(default=0)
+    completed = models.PositiveIntegerField(default=0)
+    failed = models.PositiveIntegerField(default=0)
+    message = models.TextField(blank=True)
+
+    class Meta:
+        ordering = ['-id']
+        constraints = [models.CheckConstraint(
+            condition=(models.Q(active_slot=1, active_slot__isnull=False, status__in=['queued', 'running']) |
+                       models.Q(active_slot__isnull=True, status__in=['completed', 'failed'])),
+            name='scan_run_active_state')]
+
+
+class ScanResult(models.Model):
+    run = models.ForeignKey(ScanRun, on_delete=models.CASCADE, related_name='results')
+    domain = models.ForeignKey(domainlist, null=True, on_delete=models.SET_NULL)
+    hostname = models.CharField(max_length=255)
+    success = models.BooleanField()
+    error = models.TextField(blank=True)
+    checked_at = models.DateTimeField(auto_now_add=True)

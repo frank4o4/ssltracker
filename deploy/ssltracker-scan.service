@@ -1,0 +1,11 @@
+[Unit]
+Description=Queue the daily SSL scan
+After=ssltracker-worker.service
+
+[Service]
+Type=oneshot
+User=ssltracker
+Group=ssltracker
+WorkingDirectory=/opt/ssltracker
+EnvironmentFile=/etc/ssltracker.env
+ExecStart=/opt/ssltracker/.venv/bin/python manage.py queue_ssl_scan

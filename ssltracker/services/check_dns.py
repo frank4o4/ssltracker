@@ -23,7 +23,7 @@ def query_dns_with_nameserver(domain, nameserver):
         return f"DNS query failed: {e}"
 
 # Example usage with a specific DNS server (replace '8.8.8.8' with the desired DNS server)
-domain_name = "www.canon.ca"
+domain_name = "www.example.com"
 dns_server = "8.8.8.8"
 
 # Query for both A and CNAME records using the specified DNS server

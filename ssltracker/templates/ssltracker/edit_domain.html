@@ -1,12 +1,1 @@
-{% extends 'ssltracker/base.html' %}
-
-{% block content %}
-  <h2>Edit Domain</h2>
-  <div class="form-group">
-  <form method="POST">
-    {% csrf_token %}
-    {{ form.as_p }}
-    <button type="submit">Update</button>
-  </form>
-</div>
-{% endblock %}
+{% extends 'ssltracker/base.html' %}{% block title %}Edit domain · SSL Tracker{% endblock %}{% block content %}<div class="page-head"><div><div class="eyebrow">WORKSPACE</div><h1>Edit domain</h1><p>Update the hostname and the contacts responsible for its certificate.</p></div></div><section class="panel form-panel"><form method="post">{% csrf_token %}{% include 'ssltracker/fields.html' %}<div class="form-actions"><button type="submit" class="btn btn-primary">Save changes</button><a class="btn" href="{% url 'index' %}">Cancel</a></div></form></section>{% endblock %}

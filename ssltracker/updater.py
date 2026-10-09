@@ -2,7 +2,7 @@ import ssl
 import socket
 
 # Define the target website and port
-website = "www.canon.ca"
+website = "www.example.com"
 port = 443  # Default port for HTTPS
 
 # Create a socket connection to the website

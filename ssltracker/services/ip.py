@@ -9,7 +9,7 @@ def get_ip_address(domain):
         return None
 
 # Example usage
-domain_name = "www.canon.ca"
+domain_name = "www.example.com"
 ip_address = get_ip_address(domain_name)
 
 if ip_address:

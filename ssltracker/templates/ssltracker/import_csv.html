@@ -1,12 +1,1 @@
-{% extends 'ssltracker/base.html' %}
-
-{% block content %}
-  <h1>Import CSV Data</h1>
-  <form method="post" action="{% url 'import_csv' %}" enctype="multipart/form-data">
-      {% csrf_token %}
-      <label for="csv_file">Choose CSV File:</label>
-      <input type="file" name="csv_file" accept=".csv" required>
-      <br>
-      <button type="submit">Import CSV</button>
-  </form>
-{% endblock %}
+{% extends 'ssltracker/base.html' %}{% block content %}<div class="page-head"><div><div class="eyebrow">CSV IMPORT</div><h1>Import domains</h1><p>Upload a UTF-8 CSV file without a header row.</p></div></div><section class="panel form-panel"><p>Column order: <code>domain_name,cert_location</code></p><p>Exported reports have a different layout; adjust their columns before importing.</p><form method="post" enctype="multipart/form-data">{% csrf_token %}<div class="field"><label for="csv_file">CSV file</label><input id="csv_file" type="file" name="csv_file" accept=".csv" required></div><button type="submit" class="btn btn-primary">Import CSV</button></form></section>{% endblock %}

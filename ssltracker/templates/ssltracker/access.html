@@ -1,10 +1,1 @@
-<!-- add_user.html -->
-
-{% extends 'ssltracker/base.html' %}
-
-{% block content %}
-  <h2>Access Denied</h2>
-  
-<p>You don't have permission to access this page</p>
-
-{% endblock %}
+{% extends 'ssltracker/base.html' %}{% block content %}<section class="panel form-panel"><div class="eyebrow">WORKSPACE ACCESS</div><h1>Access restricted</h1><p>Your account does not have permission to use this page. Ask an administrator if you need access.</p><a class="btn" href="{% url 'index' %}">Return to overview</a></section>{% endblock %}

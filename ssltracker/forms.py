@@ -1,3 +1,4 @@
+import secrets
 from django import forms
 from .models import domainlist, contacts,ssl_settings
 from django.forms import ModelForm, TextInput, EmailInput,Select,CheckboxInput
@@ -159,7 +160,7 @@ class AddUserForm(UserCreationForm):
     def clean_password1(self):
         password = self.cleaned_data.get('password1')
         if not password:
-            password = User.objects.make_random_password()
+            password = secrets.token_urlsafe(18)
         return password
 
     def save(self, commit=True):

@@ -8,7 +8,12 @@ from .decorators import group_required
 from django.db.models import F
 from django.contrib.auth.decorators import login_required
 from django.contrib.auth import logout
-from .utils import check_ssl,update_ssl,check_expiry,update_ipAddress,digiApiGet,digiCleanTable,update_domainlist_from_digicert
+from .utils import check_expiry
+from .jobs import enqueue_scan
+from .models import ScanRun
+from django.contrib import messages
+from django.views.decorators.http import require_POST
+from django.utils import timezone
 from .forms import DomainListForm, ContactListForm,SSLSettingsForm,DomainEditForm,ContactAssociationForm,AddUserForm,UserEditForm,CustomPasswordChangeForm
 from django.core.paginator import Paginator
 from django.db.models import Q
@@ -20,37 +25,33 @@ from django.contrib.auth.views import PasswordChangeView
 
 @login_required
 def index(request):
-    # Get the search query from the request's GET parameters
-    search_query = request.GET.get('search')
-    
-    # Filter the data based on the search query
-    data = domainlist.objects.all().order_by(F('expires').asc(nulls_last=True))
-    if search_query:
-        data = data.filter(Q(domain_name__icontains=search_query))
-    
-    # Set the number of records per page
-    records_per_page = 25
-
-    # Create a Paginator object
-    paginator = Paginator(data, records_per_page)
-
-    # Get the current page number from the request's GET parameters
-    page_number = request.GET.get('page')
-
-    # Get the Page object for the requested page number
-    page_obj = paginator.get_page(page_number)
-
-    # Pass the page object and search query to the template
-    context = {
-        'page_obj': page_obj,
-        'search_query': search_query,
-    }
-
-    unchecked_count = unchecked_notification(request)  # Pass the 'request' object
-    context['unchecked_notification_count'] = unchecked_count
-
-    
-    return render(request, 'ssltracker/home.html', context)
+    from django.db.models import Count
+    from .presentation import expiry_info
+    query = domainlist.objects.all()
+    search = request.GET.get('search', '').strip()
+    selected = request.GET.get('status', 'all')
+    if selected not in ('all', 'soon', 'expired', 'unchecked'):
+        selected = 'all'
+    stats = {'total': query.count(), 'soon': 0, 'expired': 0,
+             'unchecked': query.exclude(last_updated=timezone.localdate().isoformat()).count()}
+    dates = {'soon': [], 'expired': []}
+    for group in query.values('expires').annotate(count=Count('pk')):
+        state = expiry_info(group['expires'])['state']
+        if state in dates:
+            dates[state].append(group['expires'])
+            stats[state] += group['count']
+    if selected in dates:
+        query = query.filter(expires__in=dates[selected])
+    elif selected == 'unchecked':
+        query = query.exclude(last_updated=timezone.localdate().isoformat())
+    if search:
+        query = query.filter(domain_name__icontains=search)
+    page = Paginator(query.order_by(F('expires').asc(nulls_last=True), 'domain_name'), 25).get_page(request.GET.get('page'))
+    return render(request, 'ssltracker/home.html', {
+        'page_obj': page, 'search_query': search, 'selected_status': selected,
+        'stats': stats, 'active_run': ScanRun.objects.filter(active_slot=1).first(),
+        'latest_run': ScanRun.objects.first(),
+    })
 
 @login_required
 @group_required('Admins')
@@ -88,24 +89,41 @@ def login_view(request):
 
    
 
+@require_POST
 def logout_view(request):
     auth_logout(request)
     return redirect('index')
 
 
-@group_required('Admins', 'Dashboard')
 @login_required
+@group_required('Admins', 'Dashboard')
+@require_POST
 def update_ssl_view(request):
-    digiCleanTable()
-    digiApiGet()
-    update_domainlist_from_digicert()
-    update_ssl()
-    update_ipAddress()
-    return redirect('index')
+    run, created = enqueue_scan(request.user)
+    messages.info(request, 'SSL scan queued. You can close this page.' if created else
+                  'A scan is already queued or running. Showing that scan.')
+    return redirect('scan_detail', pk=run.pk)
+
+
+@login_required
+@group_required('Admins', 'Dashboard', 'Readers')
+def scan_list(request):
+    page = Paginator(ScanRun.objects.select_related('requested_by').all(), 25).get_page(request.GET.get('page'))
+    return render(request, 'ssltracker/scans.html', {'page_obj': page})
+
+
+@login_required
+@group_required('Admins', 'Dashboard', 'Readers')
+def scan_detail(request, pk):
+    run = get_object_or_404(ScanRun.objects.select_related('requested_by'), pk=pk)
+    failures = Paginator(run.results.filter(success=False).order_by('pk'), 50).get_page(request.GET.get('page'))
+    stale = run.status == 'running' and run.heartbeat_at and (timezone.now() - run.heartbeat_at).total_seconds() > 120
+    return render(request, 'ssltracker/scan_detail.html', {'run': run, 'failures': failures, 'stale': stale})
 
 
 @group_required('Admins', 'Dashboard')
 @login_required
+@require_POST
 def email_users(request):
     check_expiry()
     return redirect('index')
@@ -166,6 +184,7 @@ def edit_domain(request, pk):
 
 @group_required('Admins','Dashboard')
 @login_required
+@require_POST
 def delete_domain(request, pk):
     domain = domainlist.objects.get(id=pk)
     domain_name = domain.domain_name
@@ -227,7 +246,7 @@ def list_contacts(request):
 def view_user_ssls(request, user_id):
     user = contacts.objects.get(pk=user_id)
     ssls = user.domainlist_set.all()
-    context = {'user': user, 'ssls': ssls}
+    context = {'contact': user, 'ssls': ssls}
     return render(request, 'ssltracker/user_ssls.html', context)
 
 @group_required('Admins','Dashboard')
@@ -274,6 +293,7 @@ def edit_contact(request, pk):
 
 @group_required('Admins','Dashboard')
 @login_required
+@require_POST
 def delete_contact(request, pk):
     contact = contacts.objects.get(id=pk)
     first_name = contact.first_name
@@ -310,15 +330,15 @@ def edit_ssl_settings(request):
 @group_required('Admins', 'Readers', 'Dashboard')
 @login_required
 def unchecked_notification(request):
-    today = datetime.datetime.today().date()
+    today = timezone.localdate()
     unchecked_count = domainlist.objects.exclude(last_updated=today).count()
     return unchecked_count
 
 @group_required('Admins', 'Readers', 'Dashboard')
 @login_required
 def view_unchecked_ssls(request):
-    today = datetime.datetime.today().date()
-    unchecked_ssls = domainlist.objects.exclude(last_updated=today)
+    today = timezone.localdate()
+    unchecked_ssls = domainlist.objects.exclude(last_updated=today).order_by('domain_name')
    
     # Set the number of records per page
     records_per_page = 25
@@ -340,16 +360,13 @@ def view_unchecked_ssls(request):
     return render(request, 'ssltracker/unchecked_ssls.html', context)
 
 
-@group_required('Admins', 'Dashboard')
 @login_required
+@group_required('Admins', 'Dashboard')
+@require_POST
 def update_unchecked_ssls(request):
-    today = datetime.datetime.today().date()
-    unchecked_ssls = domainlist.objects.exclude(last_updated=today)
-    for domain_record in unchecked_ssls:
-        domain_name = domain_record.domain_name
-        check_ssl(domain_name)
-
-    return redirect('index')
+    run, created = enqueue_scan(request.user, mode='unchecked')
+    messages.info(request, 'Recheck queued.' if created else 'A scan is already active; showing that scan.')
+    return redirect('scan_detail', pk=run.pk)
 
 
 @login_required
@@ -403,25 +420,26 @@ def edit_users(request, user_id):
         form = UserEditForm(request.POST, instance=user)
         if form.is_valid():
             edit_user = form.save()
-        # Log the information
-        now = datetime.datetime.now()
-        log_entry = ssl_logs(
-        log_date=datetime.datetime.now().date(),
-        log_time=now.strftime("%H:%M:%S"),
-        user=request.user.username,  # Assuming user is logged in
-        log_data=f"User Edit: {edit_user.first_name} {edit_user.last_name} {edit_user.email} "
-        )
-        log_entry.save()
-        return redirect('list_users')
+            # Log the information
+            now = datetime.datetime.now()
+            log_entry = ssl_logs(
+            log_date=datetime.datetime.now().date(),
+            log_time=now.strftime("%H:%M:%S"),
+            user=request.user.username,  # Assuming user is logged in
+            log_data=f"User Edit: {edit_user.first_name} {edit_user.last_name} {edit_user.email} "
+            )
+            log_entry.save()
+            return redirect('list_users')
     else:
         form = UserEditForm(instance=user)
 
-    return render(request, 'ssltracker/edit_users.html', {'form': form, 'user': user})
+    return render(request, 'ssltracker/edit_users.html', {'form': form, 'edited_user': user})
 
 
 
 @login_required
 @group_required('Admins')
+@require_POST
 def delete_user(request, user_id):
     user = get_object_or_404(User, id=user_id)
     first_name = user.first_name
@@ -535,3 +553,10 @@ def import_from_csv2(request):
     return render(request, 'ssltracker/import_contacts.html')
 
 
+
+
+# Compatibility for old django-crontab entries until operators remove them.
+from .utils import update_ssl, update_ipAddress, digiCleanTable
+
+def digiApiGet():
+    return update_ssl()

@@ -1,86 +1,28 @@
-
-<!DOCTYPE html>
-<html>
-<head>
-  <title>{% block title %}{% endblock %}</title>
- {% load bootstrap5 %}
-  {% bootstrap_css %}
-  {% bootstrap_javascript %}
-  <style>
-    main {
-      padding-left: 20px;
-      padding-top:20px;
-    }
-
-  </style>
-</head>
-<body>
-  <nav class="navbar navbar-expand-lg navbar-dark bg-dark">&nbsp;
-    <a class="navbar-brand" href="/">SSL Tracker</a>
-    <button class="navbar-toggler" type="button" data-toggle="collapse" data-target="#navbarNav" aria-controls="navbarNav" aria-expanded="false" aria-label="Toggle navigation">
-      <span class="navbar-toggler-icon"></span>
-    </button>
-    <div class="collapse navbar-collapse" id="navbarNav">
-      <ul class="navbar-nav">
-        <li class="nav-item">
-          <a class="nav-link" href="/">Home</a>
-        </li>
-        {% if user.is_authenticated %}
-        <li class="nav-item">
-          <a class="nav-link" href="{% url 'add_domain' %}">Add SSL</a>
-        </li>
-        <li class="nav-item">
-          <a class="nav-link" href="{% url 'update_ssl' %}">Update SSL List</a>
-        </li>
-        <li class="nav-item">
-          <a class="nav-link" href="{% url 'email_users' %}">Email Expiry Emails</a>
-        </li>
-        <li class="nav-item">
-          <a class="nav-link" href="{% url 'add_contact' %}">Add Contacts</a>
-        </li>
-        
-          <li class="nav-item">
-            <a class="nav-link" href="{% url 'list_contacts' %}">List Contacts</a>
-          </li>
-
-          <li class="nav-item">
-            <a class="nav-link" href="{% url 'register_user' %}">Add User</a>
-          </li>
-          <li class="nav-item">
-            <a class="nav-link" href="{% url 'list_users' %}">List Users</a>
-          </li>
-          <li class="nav-item">
-            <a class="nav-link" href="{% url 'edit_ssl_settings' %}">Settings</a>
-          </li>
-          <li class="nav-item">
-            <a class="nav-link" href="{% url 'view_logs' %}">View Logs</a>
-          </li>
-        </ul>
-    
-        <ul class="ms-auto">
-          <li class="nav-item dropdown">
-            <a class="nav-link dropdown-toggle" href="#" role="button" data-bs-toggle="dropdown" aria-expanded="false">Account Settings</a>
-            <ul class="dropdown-menu">
-              <li><a class="dropdown-item" href="{% url 'password_change' %}">Change Password</a></li>
-              <li><a class="dropdown-item" href="{% url 'logout' %}">Logout</a></li>
-            </ul>
-          </li>
-        </ul>
-        
-        {% endif %}
-    
-    </div>
-  </nav>
-
-
-    <main>
-        {% block content %}
-        
-        {% endblock %}
-    </main>
-
-    <footer>
-        <p>&nbsp;</p>
-    </footer>
-</body>
-</html>
+{% load static %}<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
+<title>{% block title %}SSL Tracker{% endblock %}</title>
+<link rel="stylesheet" href="{% static 'ssltracker/app.css' %}"><script defer src="{% static 'ssltracker/app.js' %}"></script></head>
+<body class="{% if not request.user.is_authenticated %}signed-out{% endif %}">
+<a class="skip-link" href="#main">Skip to content</a>
+{% if request.user.is_authenticated %}
+<aside class="sidebar" id="sidebar">
+<a href="{% url 'index' %}" class="brand"><span class="brand-mark">{% include 'ssltracker/icon.html' with name='shield' %}</span><span>SSL<span class="brand-light">Tracker</span><small>CERTIFICATE MONITOR</small></span></a>
+<div class="nav-label">WORKSPACE</div>
+<nav aria-label="Main navigation">
+<a href="{% url 'index' %}" {% if request.resolver_match.url_name == 'index' %}class="active" aria-current="page"{% endif %}>{% include 'ssltracker/icon.html' with name='grid' %}Overview</a>
+<a href="{% url 'scan_list' %}" {% if request.resolver_match.url_name == 'scan_list' or request.resolver_match.url_name == 'scan_detail' %}class="active" aria-current="page"{% endif %}>{% include 'ssltracker/icon.html' with name='activity' %}Scan history</a>
+<a href="{% url 'unchecked_ssls' %}" {% if request.resolver_match.url_name == 'unchecked_ssls' %}class="active" aria-current="page"{% endif %}>{% include 'ssltracker/icon.html' with name='clock' %}Unchecked domains</a>
+<a href="{% url 'list_contacts' %}" {% if request.resolver_match.url_name == 'list_contacts' %}class="active" aria-current="page"{% endif %}>{% include 'ssltracker/icon.html' with name='users' %}Contacts</a>
+{% if can_admin %}<div class="nav-label">ADMINISTRATION</div>
+<a href="{% url 'list_users' %}" {% if request.resolver_match.url_name == 'list_users' %}class="active" aria-current="page"{% endif %}>{% include 'ssltracker/icon.html' with name='users' %}Users</a>
+<a href="{% url 'view_logs' %}" {% if request.resolver_match.url_name == 'view_logs' %}class="active" aria-current="page"{% endif %}>{% include 'ssltracker/icon.html' with name='list' %}Activity log</a>
+<a href="{% url 'edit_ssl_settings' %}" {% if request.resolver_match.url_name == 'edit_ssl_settings' %}class="active" aria-current="page"{% endif %}>{% include 'ssltracker/icon.html' with name='settings' %}Settings</a>{% endif %}
+</nav>
+<div class="sidebar-note">A clearer view of your certificates.<span>Monitor expiry. Stay ahead.</span></div>
+<div class="account"><span class="avatar">{{ request.user.username|slice:':1'|upper }}</span><div><strong>{{ request.user.username }}</strong><a href="{% url 'password_change' %}">Change password</a></div><form method="post" action="{% url 'logout' %}">{% csrf_token %}<button class="icon-button" title="Sign out" aria-label="Sign out">{% include 'ssltracker/icon.html' with name='logout' %}</button></form></div>
+</aside>
+<div class="workspace"><header class="topbar"><button class="icon-button menu-toggle" aria-controls="sidebar" aria-expanded="false" aria-label="Toggle navigation">{% include 'ssltracker/icon.html' with name='menu' %}</button><span>Workspace <span class="crumb">/</span> Certificate monitoring</span><span class="topbar-date">{% now 'D, M j, Y' %}</span></header>
+{% else %}<div class="auth-brand"><a class="brand" href="{% url 'index' %}"><span class="brand-mark">{% include 'ssltracker/icon.html' with name='shield' %}</span>SSL<span class="brand-light">Tracker</span></a></div><div class="workspace">{% endif %}
+<main id="main" tabindex="-1">{% for message in messages %}<div class="alert alert-info" role="status">{{ message }}</div>{% endfor %}{% block content %}{% endblock %}</main>
+<footer class="footer">SSL Tracker <span>Certificate visibility, without the clutter.</span></footer></div>
+</body></html>

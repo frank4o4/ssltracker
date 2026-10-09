@@ -1,0 +1,10 @@
+[Unit]
+Description=Daily SSL certificate scan
+
+[Timer]
+OnCalendar=*-*-* 05:00:00
+Persistent=true
+Unit=ssltracker-scan.service
+
+[Install]
+WantedBy=timers.target
